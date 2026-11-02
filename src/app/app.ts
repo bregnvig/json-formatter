@@ -33,12 +33,16 @@ import {
   faWandMagicSparkles,
   faXmark,
   faDownLeftAndUpRightToCenter,
+  faGlobe,
+  faRotateRight,
+  faSpinner,
   faUpRightAndDownLeftFromCenter,
 } from '@fortawesome/free-solid-svg-icons';
 import { HistoryEntry, HistoryService } from './history.service';
 import { FoldCommand, JsonNode } from './json-node';
 import { formatBytes, highlightChunks, parseJson, sortKeysDeep } from './json-utils';
 import { isBoolean, oneOf, persistedSignal } from './prefs';
+import { asHttpUrl, fetchText, fileNameFromUrl } from './url-fetch';
 import { ThemeMode, ThemeService } from './theme.service';
 
 type Indent = '2' | '4' | 'tab';
@@ -82,6 +86,9 @@ export class App {
     faWandMagicSparkles,
     faXmark,
     faDownLeftAndUpRightToCenter,
+    faGlobe,
+    faRotateRight,
+    faSpinner,
     faUpRightAndDownLeftFromCenter,
   };
 
@@ -108,6 +115,11 @@ export class App {
   protected readonly dragging = signal(false);
   protected readonly historyOpen = signal(false);
   protected readonly copied = signal(false);
+  /** URL currently being fetched, if any. */
+  protected readonly fetching = signal<string | null>(null);
+  /** Why the last fetch failed, or the HTTP status if it wasn't 2xx. */
+  protected readonly fetchError = signal<string | null>(null);
+  private fetchAbort?: AbortController;
   protected readonly fold = signal<FoldCommand | null>(null);
   /** Output pane fills the whole work area (input and history hidden). */
   protected readonly maximized = signal(false);
@@ -151,6 +163,9 @@ export class App {
         })),
   );
 
+  /** The input is just a URL (e.g. typed in): offer to fetch it instead of a parse error. */
+  protected readonly inputUrl = computed(() => asHttpUrl(this.committed()));
+
   protected readonly summary = computed(() => describe(this.value()));
   protected readonly inputSize = computed(() => formatBytes(new Blob([this.committed()]).size));
 
@@ -170,6 +185,7 @@ export class App {
     this.input.set(text);
     this.committed.set(text);
     this.fold.set(null);
+    this.fetchError.set(null);
   }
 
   private commitNow(): void {
@@ -180,6 +196,7 @@ export class App {
   // ── Input sources ────────────────────────────────────────────────
 
   protected onEdit(text: string): void {
+    this.fetchError.set(null);
     this.input.set(text);
     this.sourceName.set(null);
     clearTimeout(this.commitTimer);
@@ -190,8 +207,19 @@ export class App {
     }
   }
 
-  /** Paste into the textarea: let the browser insert it, then record if valid. */
-  protected onTextareaPaste(): void {
+  /**
+   * Paste into the textarea. A URL pasted into an empty editor (or over all of it) is fetched;
+   * a URL pasted into the middle of a document is just text. Otherwise let the browser insert
+   * the paste, then record it if valid.
+   */
+  protected onTextareaPaste(event: ClipboardEvent): void {
+    const url = asHttpUrl(event.clipboardData?.getData('text/plain') ?? '');
+    const ta = event.target as HTMLTextAreaElement;
+    if (url && ta.selectionStart === 0 && ta.selectionEnd === ta.value.length) {
+      event.preventDefault();
+      void this.fetchUrl(url);
+      return;
+    }
     setTimeout(() => {
       this.commitNow();
       this.remember();
@@ -213,8 +241,9 @@ export class App {
 
   @HostListener('document:keydown.escape')
   protected onEscape(): void {
-    // Close the innermost thing first: the history pane, then a maximized output.
-    if (this.historyOpen() && !this.maximized()) this.historyOpen.set(false);
+    // Close the innermost thing first: a running fetch, the history pane, a maximized output.
+    if (this.fetching()) this.cancelFetch();
+    else if (this.historyOpen() && !this.maximized()) this.historyOpen.set(false);
     else this.maximized.set(false);
   }
 
@@ -226,13 +255,17 @@ export class App {
     const text = event.clipboardData?.getData('text/plain');
     if (!text) return;
     event.preventDefault();
-    this.load(text, null);
+    const url = asHttpUrl(text);
+    if (url) void this.fetchUrl(url);
+    else this.load(text, null);
   }
 
   protected async pasteFromClipboard(): Promise<void> {
     try {
       const text = await navigator.clipboard.readText();
-      if (text) this.load(text, null);
+      const url = asHttpUrl(text);
+      if (url) void this.fetchUrl(url);
+      else if (text) this.load(text, null);
     } catch {
       this.textarea().nativeElement.focus();
     }
@@ -278,6 +311,37 @@ export class App {
       const text = e.dataTransfer?.getData('text/plain');
       if (text) this.load(text, null);
     }
+  }
+
+  /** GET the URL and show the response. The URL stays visible in the editor until it arrives. */
+  protected async fetchUrl(url: URL | null = this.inputUrl()): Promise<void> {
+    if (!url) return;
+    this.fetchAbort?.abort();
+    const ctl = new AbortController();
+    this.fetchAbort = ctl;
+    this.setText(url.href);
+    this.sourceName.set(null);
+    this.fetching.set(url.href);
+    try {
+      const res = await fetchText(url, ctl.signal);
+      if (!res.text.trim()) throw new Error(`HTTP ${res.status}: the response was empty`);
+      this.load(res.text, url.href);
+      if (!res.ok) this.fetchError.set(`HTTP ${res.status} ${res.statusText}`.trim());
+    } catch (e) {
+      if (ctl.signal.aborted) return; // cancelled, or replaced by a newer fetch
+      this.fetchError.set(e instanceof Error ? e.message : String(e));
+    } finally {
+      if (this.fetchAbort === ctl) {
+        this.fetchAbort = undefined;
+        this.fetching.set(null);
+      }
+    }
+  }
+
+  protected cancelFetch(): void {
+    this.fetchAbort?.abort();
+    this.fetchAbort = undefined;
+    this.fetching.set(null);
   }
 
   private async loadFile(file: File): Promise<void> {
@@ -330,7 +394,8 @@ export class App {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = this.sourceName() ?? 'formatted.json';
+    const name = this.sourceName();
+    a.download = !name ? 'formatted.json' : asHttpUrl(name) ? fileNameFromUrl(name) : name;
     a.click();
     URL.revokeObjectURL(url);
   }

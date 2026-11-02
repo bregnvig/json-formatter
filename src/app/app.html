@@ -132,13 +132,13 @@
 
         <textarea #editor spellcheck="false" autocapitalize="off" autocomplete="off"
           class="min-h-0 flex-1 resize-none bg-transparent p-3 font-mono text-sm leading-relaxed outline-none placeholder:text-slate-400 dark:placeholder:text-slate-600"
-          placeholder="Paste JSON here or drop a .json file…"
-          (input)="onEdit(editor.value)" (paste)="onTextareaPaste()"></textarea>
+          placeholder="Paste JSON or a URL here, or drop a .json file…"
+          (input)="onEdit(editor.value)" (paste)="onTextareaPaste($event)"></textarea>
 
         @if (!input() && !dragging()) {
           <div class="pointer-events-none absolute inset-x-0 top-1/2 flex -translate-y-1/2 flex-col items-center gap-3 text-slate-400 dark:text-slate-600">
             <fa-icon [icon]="icons.faFileArrowUp" class="text-5xl" />
-            <p class="text-sm">Paste anywhere, or drop a file here</p>
+            <p class="text-sm">Paste JSON or a link anywhere, or drop a file here</p>
           </div>
         }
 
@@ -151,9 +151,33 @@
           </div>
         }
 
+        @if (fetching()) {
+          <div class="absolute inset-0 z-10 m-1 grid place-items-center rounded-lg bg-white/85 dark:bg-slate-900/85">
+            <div class="flex max-w-[90%] flex-col items-center gap-3 text-center">
+              <fa-icon [icon]="icons.faSpinner" animation="spin" class="text-2xl text-sky-600 dark:text-sky-400" />
+              <span class="text-sm">Fetching</span>
+              <span class="max-w-full truncate text-xs text-slate-500" [title]="fetching()">{{ fetching() }}</span>
+              <button type="button" class="btn-ghost text-xs" (click)="cancelFetch()">Cancel (Esc)</button>
+            </div>
+          </div>
+        }
+
         @let p = parsed();
         <footer class="pane-footer">
-          @if (p.ok === true) {
+          @if (fetchError(); as err) {
+            <span class="min-w-0 truncate text-rose-600 dark:text-rose-400" [title]="err">
+              <fa-icon [icon]="icons.faCircleExclamation" /> {{ err }}
+            </span>
+            @if (inputUrl()) {
+              <button type="button" class="btn-ghost shrink-0 text-xs" (click)="fetchUrl()">
+                <fa-icon [icon]="icons.faRotateRight" /> Retry
+              </button>
+            }
+          } @else if (inputUrl() && !fetching()) {
+            <button type="button" class="btn-ghost -ml-2 text-xs text-sky-700 dark:text-sky-400" (click)="fetchUrl()">
+              <fa-icon [icon]="icons.faGlobe" /> Fetch this URL
+            </button>
+          } @else if (p.ok === true) {
             <span class="text-emerald-600 dark:text-emerald-400"><fa-icon [icon]="icons.faCheck" /> Valid JSON</span>
             <span class="text-slate-500">{{ summary() }}</span>
             @if (p.unescaped) {
