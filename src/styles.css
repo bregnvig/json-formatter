@@ -144,3 +144,39 @@
     animation: none;
   }
 }
+
+/* Help popover: fade/slide in and out using the native popover's top-layer transitions. */
+.help-popover {
+  opacity: 0;
+  transform: translateY(-0.5rem);
+  transition:
+    opacity 160ms ease-in,
+    transform 160ms ease-in,
+    overlay 160ms allow-discrete,
+    display 160ms allow-discrete;
+}
+.help-popover:popover-open {
+  opacity: 1;
+  transform: none;
+  transition-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
+  transition-duration: 200ms;
+}
+@starting-style {
+  .help-popover:popover-open {
+    opacity: 0;
+    transform: translateY(-0.5rem);
+  }
+}
+.help-popover code,
+.help-popover kbd {
+  @apply rounded bg-slate-100 px-1 text-[0.8em] text-slate-800 dark:bg-slate-700 dark:text-slate-100;
+}
+.help-popover kbd {
+  @apply border border-b-2 border-slate-300 dark:border-slate-600;
+}
+@media (prefers-reduced-motion: reduce) {
+  .help-popover,
+  .help-popover:popover-open {
+    transition: none;
+  }
+}

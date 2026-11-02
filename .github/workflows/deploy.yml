@@ -26,6 +26,13 @@ jobs:
       - run: npm ci
       - run: npm test -- --watch=false
       - run: npm run build
+      - name: Publish third-party licenses
+        run: |
+          out=dist/json-formatter/browser/3rdpartylicenses.txt
+          cp dist/json-formatter/3rdpartylicenses.txt "$out"
+          # Fonts come in via CSS, so the build doesn't collect their license.
+          printf '\n%s\nPackage: @fontsource/ubuntu-mono (Ubuntu Mono font files)\nLicense: Ubuntu Font Licence 1.0\n\n' "$(printf -- '-%.0s' {1..80})" >> "$out"
+          cat node_modules/@fontsource/ubuntu-mono/LICENSE >> "$out"
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist/json-formatter/browser

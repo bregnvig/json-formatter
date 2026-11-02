@@ -29,3 +29,13 @@ The service worker is only active in production builds.
 Every push to `main` builds, tests and deploys to GitHub Pages via `.github/workflows/deploy.yml`.
 The custom domain is set by `public/CNAME` (`json.loopme.dk`), which needs a DNS `CNAME` record pointing
 `json` at `bregnvig.github.io`.
+
+## License
+
+The code is released under the [Zero-Clause BSD license](LICENSE): do whatever you like with it, no
+attribution needed.
+
+The Loopme name and logo are not part of that license. If you fork the project, replace the logo,
+the icons in `public/icons/`, `public/favicon.*`, `public/apple-touch-icon.png` and
+`public/og-image.png`. Third-party packages keep their own licenses; a production build lists them
+in `3rdpartylicenses.txt`.

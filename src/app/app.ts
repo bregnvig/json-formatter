@@ -17,6 +17,7 @@ import {
   faArrowDownAZ,
   faCheck,
   faCircleExclamation,
+  faCircleInfo,
   faClockRotateLeft,
   faCode,
   faCompress,
@@ -75,6 +76,7 @@ export class App {
     faArrowDownAZ,
     faCheck,
     faCircleExclamation,
+    faCircleInfo,
     faClockRotateLeft,
     faCode,
     faCompress,
@@ -102,6 +104,7 @@ export class App {
 
   private readonly textarea = viewChild.required<ElementRef<HTMLTextAreaElement>>('editor');
   private readonly fileInput = viewChild.required<ElementRef<HTMLInputElement>>('fileInput');
+  private readonly help = viewChild.required<ElementRef<HTMLElement>>('help');
 
   /** What is in the editor right now. */
   protected readonly input = signal('');
@@ -238,11 +241,20 @@ export class App {
     if (e.code === 'KeyF' && e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
       e.preventDefault();
       this.maximized.set(!this.maximized());
+      return;
+    }
+    // "?" opens the help, unless the user is typing.
+    const typing = (e.target as HTMLElement | null)?.closest('input, textarea, select, [contenteditable]');
+    if (e.key === '?' && !typing && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      e.preventDefault();
+      this.help().nativeElement.togglePopover();
     }
   }
 
   @HostListener('document:keydown.escape')
   protected onEscape(): void {
+    // The browser closes an open popover (the help) on Esc by itself; leave the rest alone.
+    if (this.helpOpen) return;
     // Close the innermost thing first: a running fetch, the history pane, a maximized output.
     if (this.fetching()) this.cancelFetch();
     else if (this.historyOpen() && !this.maximized()) this.historyOpen.set(false);
@@ -338,6 +350,19 @@ export class App {
         this.fetching.set(null);
       }
     }
+  }
+
+  /**
+   * Tracked from the popover's toggle event. Esc arrives here after the browser has already
+   * closed the popover, so a live :popover-open check would say "closed".
+   */
+  private helpOpen = false;
+
+  protected onHelpToggle(e: Event): void {
+    const open = (e as ToggleEvent).newState === 'open';
+    // Defer "closed" so the Esc handler that runs right after this still sees it as open.
+    if (open) this.helpOpen = true;
+    else setTimeout(() => (this.helpOpen = false));
   }
 
   protected cancelFetch(): void {
@@ -437,6 +462,7 @@ export class App {
   }
 
   protected readonly formatBytes = formatBytes;
+  protected readonly escapedExample = '{\\"a\\":1}';
 
   protected timeAgo(ts: number): string {
     const s = Math.round((Date.now() - ts) / 1000);
