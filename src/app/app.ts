@@ -2,13 +2,16 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  DestroyRef,
   effect,
   ElementRef,
   HostListener,
   inject,
   signal,
+  untracked,
   viewChild,
 } from '@angular/core';
+import { httpResource } from '@angular/common/http';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { FaIconComponent } from '@fortawesome/angular-fontawesome';
 import { faGithub } from '@fortawesome/free-brands-svg-icons';
@@ -44,7 +47,7 @@ import { HistoryEntry, HistoryService } from './history.service';
 import { FoldCommand, JsonNode } from './json-node';
 import { formatBytes, highlightChunks, parseJson, sortKeysDeep } from './json-utils';
 import { isBoolean, oneOf, persistedSignal } from './prefs';
-import { asHttpUrl, fetchText, fileNameFromUrl } from './url-fetch';
+import { asHttpUrl, describeFetchError, fileNameFromUrl, mixedContentProblem } from './url-fetch';
 import { ThemeMode, ThemeService } from './theme.service';
 import { UpdateService } from './update.service';
 
@@ -122,11 +125,23 @@ export class App {
   protected readonly dragging = signal(false);
   protected readonly historyOpen = signal(false);
   protected readonly copied = signal(false);
+  /**
+   * What to fetch. Each request is a new object (`seq`), so fetching the same URL again
+   * re-runs the resource; setting it to undefined cancels an in-flight request.
+   */
+  private readonly fetchRequest = signal<{ url: string; keepCurrent: boolean; seq: number } | undefined>(undefined);
+  private fetchSeq = 0;
+
+  /** GETs `fetchRequest` through HttpClient; cancels the previous request when it changes. */
+  private readonly urlResource = httpResource.text(() => {
+    const req = this.fetchRequest();
+    return req && { url: req.url };
+  });
+
   /** URL currently being fetched, if any. */
-  protected readonly fetching = signal<string | null>(null);
+  protected readonly fetching = computed(() => (this.urlResource.isLoading() ? (this.fetchRequest()?.url ?? null) : null));
   /** Why the last fetch failed, or the HTTP status if it wasn't 2xx. */
   protected readonly fetchError = signal<string | null>(null);
-  private fetchAbort?: AbortController;
   protected readonly fold = signal<FoldCommand | null>(null);
   /** Output pane fills the whole work area (input and history hidden). */
   protected readonly maximized = signal(false);
@@ -170,8 +185,42 @@ export class App {
         })),
   );
 
+  /**
+   * The current time as a signal, so relative times ("5 min ago") re-render as it passes.
+   * Ticks once a minute, and is refreshed when the history pane opens.
+   */
+  private readonly now = signal(Date.now());
+
+  /** The history entry matching what is in the editor (compared only when either changes). */
+  private readonly activeEntryId = computed(() => {
+    const text = this.committed();
+    return this.history.entries().find((e) => e.content === text)?.id;
+  });
+
+  /** Everything the history list shows, precomputed so the template only reads signals. */
+  protected readonly historyItems = computed(() => {
+    const now = this.now();
+    const active = this.activeEntryId();
+    return this.history.entries().map((entry) => ({
+      entry,
+      age: timeAgo(entry.createdAt, now),
+      size: formatBytes(entry.size),
+      active: entry.id === active,
+    }));
+  });
+
   /** The input is just a URL (e.g. typed in): offer to fetch it instead of a parse error. */
   protected readonly inputUrl = computed(() => asHttpUrl(this.committed()));
+
+  /** The URL the shown document was fetched from, if any. */
+  protected readonly sourceUrl = computed(() => asHttpUrl(this.sourceName() ?? ''));
+
+  /** Fetch again: the typed URL, or refresh the document that came from a URL. */
+  protected refetch(): void {
+    const typed = this.inputUrl();
+    if (typed) this.fetchUrl(typed);
+    else this.fetchUrl(this.sourceUrl(), { keepCurrent: true });
+  }
 
   protected readonly summary = computed(() => describe(this.value()));
   protected readonly inputSize = computed(() => formatBytes(new Blob([this.committed()]).size));
@@ -179,6 +228,19 @@ export class App {
   constructor() {
     // Write programmatic changes into the editor. Done by hand rather than via [value]:
     // that binding re-assigns the whole (possibly multi-MB) text on every keystroke.
+    const tick = setInterval(() => this.now.set(Date.now()), 60_000);
+    inject(DestroyRef).onDestroy(() => clearInterval(tick));
+    effect(() => {
+      if (this.historyOpen()) untracked(() => this.now.set(Date.now()));
+    });
+
+    // When a fetch finishes (either way), move the result into the editor.
+    effect(() => {
+      const req = this.fetchRequest();
+      const status = this.urlResource.status();
+      if (req && (status === 'resolved' || status === 'error')) untracked(() => this.onFetched(req));
+    });
+
     effect(() => {
       const text = this.input();
       const ta = this.textarea().nativeElement;
@@ -224,7 +286,7 @@ export class App {
     const ta = event.target as HTMLTextAreaElement;
     if (url && ta.selectionStart === 0 && ta.selectionEnd === ta.value.length) {
       event.preventDefault();
-      void this.fetchUrl(url);
+      this.fetchUrl(url);
       return;
     }
     setTimeout(() => {
@@ -272,7 +334,7 @@ export class App {
     if (!text) return;
     event.preventDefault();
     const url = asHttpUrl(text);
-    if (url) void this.fetchUrl(url);
+    if (url) this.fetchUrl(url);
     else this.load(text, null);
   }
 
@@ -280,7 +342,7 @@ export class App {
     try {
       const text = await navigator.clipboard.readText();
       const url = asHttpUrl(text);
-      if (url) void this.fetchUrl(url);
+      if (url) this.fetchUrl(url);
       else if (text) this.load(text, null);
     } catch {
       this.textarea().nativeElement.focus();
@@ -330,28 +392,47 @@ export class App {
   }
 
   /** GET the URL and show the response. The URL stays visible in the editor until it arrives. */
-  protected async fetchUrl(url: URL | null = this.inputUrl()): Promise<void> {
+  /**
+   * GET the URL and show the response. Normally the URL stays visible in the editor until
+   * the response arrives; with `keepCurrent` (refreshing a result, e.g. from history) the
+   * current content stays on screen and is only replaced if the fetch succeeds.
+   */
+  protected fetchUrl(url: URL | null = this.inputUrl(), { keepCurrent = false } = {}): void {
     if (!url) return;
-    this.fetchAbort?.abort();
-    const ctl = new AbortController();
-    this.fetchAbort = ctl;
-    this.setText(url.href);
-    this.sourceName.set(null);
-    this.fetching.set(url.href);
-    try {
-      const res = await fetchText(url, ctl.signal);
-      if (!res.text.trim()) throw new Error(`HTTP ${res.status}: the response was empty`);
-      this.load(res.text, url.href);
-      if (!res.ok) this.fetchError.set(`HTTP ${res.status} ${res.statusText}`.trim());
-    } catch (e) {
-      if (ctl.signal.aborted) return; // cancelled, or replaced by a newer fetch
-      this.fetchError.set(e instanceof Error ? e.message : String(e));
-    } finally {
-      if (this.fetchAbort === ctl) {
-        this.fetchAbort = undefined;
-        this.fetching.set(null);
+    if (!keepCurrent) {
+      this.setText(url.href);
+      this.sourceName.set(null);
+    }
+    const blocked = mixedContentProblem(url);
+    if (blocked) {
+      this.fetchRequest.set(undefined);
+      this.fetchError.set(blocked);
+      return;
+    }
+    this.fetchError.set(null);
+    this.fetchRequest.set({ url: url.href, keepCurrent, seq: ++this.fetchSeq });
+  }
+
+  /** Hand a finished fetch to the editor, then clear the request (the resource goes idle). */
+  private onFetched(req: { url: string; keepCurrent: boolean }): void {
+    const fail = (message: string) =>
+      this.fetchError.set(req.keepCurrent ? `${message} Showing the saved copy.` : message);
+
+    if (this.urlResource.status() === 'resolved') {
+      const text = this.urlResource.value() ?? '';
+      if (text.trim()) this.load(text, req.url);
+      else fail('The response was empty.');
+    } else {
+      const failure = describeFetchError(this.urlResource.error(), new URL(req.url));
+      if (failure.body) {
+        // e.g. a 404 with a JSON error body: show it, with the status in the footer.
+        this.load(failure.body, req.url);
+        this.fetchError.set(failure.message);
+      } else {
+        fail(failure.message);
       }
     }
+    this.fetchRequest.set(undefined);
   }
 
   /**
@@ -368,9 +449,10 @@ export class App {
   }
 
   protected cancelFetch(): void {
-    this.fetchAbort?.abort();
-    this.fetchAbort = undefined;
-    this.fetching.set(null);
+    this.fetchRequest.set(undefined);
+    // Clearing the request only makes the resource ignore the response; set() is what
+    // actually aborts the HTTP request that is still in flight.
+    this.urlResource.set(undefined);
   }
 
   private async loadFile(file: File): Promise<void> {
@@ -448,10 +530,13 @@ export class App {
 
   // ── History ──────────────────────────────────────────────────────
 
+  /** Show a history entry. Entries that came from a URL are fetched again right away. */
   protected openEntry(entry: HistoryEntry): void {
+    const url = asHttpUrl(entry.name);
     this.setText(entry.content);
-    this.sourceName.set(entry.name.endsWith('.json') ? entry.name : null);
+    this.sourceName.set(url || entry.name.endsWith('.json') ? entry.name : null);
     if (window.matchMedia('(max-width: 1023px)').matches) this.historyOpen.set(false);
+    if (url) this.fetchUrl(url, { keepCurrent: true });
   }
 
   protected removeEntry(event: Event, entry: HistoryEntry): void {
@@ -463,17 +548,18 @@ export class App {
     if (confirm('Delete all saved history?')) void this.history.clear();
   }
 
-  protected readonly formatBytes = formatBytes;
   protected readonly escapedExample = '{\\"a\\":1}';
 
-  protected timeAgo(ts: number): string {
-    const s = Math.round((Date.now() - ts) / 1000);
-    if (s < 60) return 'just now';
-    if (s < 3600) return `${Math.floor(s / 60)} min ago`;
-    if (s < 86400) return `${Math.floor(s / 3600)} h ago`;
-    return new Date(ts).toLocaleDateString();
-  }
 }
+
+/** "just now", "5 min ago", "3 h ago", or a date; relative to `now` so callers control updates. */
+const timeAgo = (ts: number, now: number): string => {
+  const s = Math.round((now - ts) / 1000);
+  if (s < 60) return 'just now';
+  if (s < 3600) return `${Math.floor(s / 60)} min ago`;
+  if (s < 86400) return `${Math.floor(s / 3600)} h ago`;
+  return new Date(ts).toLocaleDateString();
+};
 
 const hasFiles = (e: DragEvent): boolean => {
   return !!e.dataTransfer?.types.includes('Files');

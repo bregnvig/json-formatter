@@ -1,3 +1,5 @@
+import { HttpErrorResponse, HttpInterceptorFn } from '@angular/common/http';
+
 /** A single http(s) URL and nothing else (surrounding whitespace allowed), or null. */
 export const asHttpUrl = (text: string): URL | null => {
   const t = text.trim();
@@ -9,46 +11,49 @@ export const asHttpUrl = (text: string): URL | null => {
   }
 };
 
-export interface FetchResult {
-  text: string;
-  status: number;
-  statusText: string;
-  ok: boolean;
+/** Requests to remote URLs give up after this long (applied by `timeoutInterceptor`). */
+export const FETCH_TIMEOUT_MS = 30_000;
+
+const isLocal = (host: string) =>
+  host === 'localhost' || host === '127.0.0.1' || host === '[::1]' || host.endsWith('.localhost');
+
+/** Why the browser will refuse this URL before even trying, or null. */
+export const mixedContentProblem = (url: URL, pageProtocol = location.protocol): string | null =>
+  // An https page cannot load plain http, except from the local machine.
+  pageProtocol === 'https:' && url.protocol === 'http:' && !isLocal(url.hostname)
+    ? `Browsers block http:// requests from an https:// page. Try https://${url.host}${url.pathname}${url.search}`
+    : null;
+
+export interface FetchFailure {
+  /** Shown to the user. */
+  message: string;
+  /** The response body, when the server answered with an error status but sent content. */
+  body: string | null;
 }
 
-const TIMEOUT_MS = 30_000;
-const isLocal = (host: string) => host === 'localhost' || host === '127.0.0.1' || host === '[::1]' || host.endsWith('.localhost');
-
-/**
- * GET a URL from the browser. There is no server behind this app, so the target must allow
- * cross-origin requests (CORS). Errors are thrown as readable messages; an abort through
- * `signal` rejects with an AbortError, which callers should ignore.
- */
-export const fetchText = async (url: URL, signal: AbortSignal): Promise<FetchResult> => {
-  // An https page cannot load plain http, except from the local machine.
-  if (location.protocol === 'https:' && url.protocol === 'http:' && !isLocal(url.hostname)) {
-    throw new Error(`Browsers block http:// requests from an https:// page. Try https://${url.host}${url.pathname}${url.search}`);
+/** Turn an HttpClient error for `url` into something readable. */
+export const describeFetchError = (err: unknown, url: URL): FetchFailure => {
+  if (!(err instanceof HttpErrorResponse)) {
+    return { message: err instanceof Error ? err.message : String(err), body: null };
   }
-  const timeout = AbortSignal.timeout(TIMEOUT_MS);
-  try {
-    // Accept is a CORS-safelisted header, so this stays a "simple" request (no preflight).
-    const res = await fetch(url, {
-      headers: { Accept: 'application/json, text/plain;q=0.9, */*;q=0.8' },
-      signal: AbortSignal.any([signal, timeout]),
-    });
-    const text = await res.text();
-    // Angular's service worker turns a failed network request into an empty 504.
-    if (res.status === 504 && !text) throw new TypeError('network error via service worker');
-    return { text, status: res.status, statusText: res.statusText, ok: res.ok };
-  } catch (e) {
-    if (signal.aborted) throw e;
-    if (timeout.aborted) throw new Error(`${url.host} did not answer within ${TIMEOUT_MS / 1000} seconds`);
-    // fetch reports CORS refusals and unreachable hosts identically, as a TypeError.
-    throw new Error(
-      `Couldn't load ${url.host}. Either it doesn't allow requests from other websites (CORS), or it can't be reached.`,
-    );
+  if (err.error instanceof DOMException && err.error.name === 'TimeoutError') {
+    return { message: `${url.host} did not answer within ${FETCH_TIMEOUT_MS / 1000} seconds`, body: null };
   }
+  const body = typeof err.error === 'string' && err.error.trim() ? err.error : null;
+  // Status 0: the browser refused (CORS) or never reached the host; it can't tell us which.
+  // Angular's service worker reports the same failure as an empty 504.
+  if (err.status === 0 || (err.status === 504 && !body)) {
+    return {
+      message: `Couldn't load ${url.host}. Either it doesn't allow requests from other websites (CORS), or it can't be reached.`,
+      body: null,
+    };
+  }
+  return { message: `HTTP ${err.status} ${err.statusText ?? ''}`.trim(), body };
 };
+
+/** Gives every HttpClient request a timeout (HttpResourceRequest has no option for it). */
+export const timeoutInterceptor: HttpInterceptorFn = (req, next) =>
+  next(req.timeout ? req : req.clone({ timeout: FETCH_TIMEOUT_MS }));
 
 /** A sensible download filename for a fetched URL: its last path segment, as .json. */
 export const fileNameFromUrl = (url: string): string => {

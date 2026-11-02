@@ -77,15 +77,16 @@
           </div>
         </div>
         <ul class="flex-1 overflow-y-auto p-2">
-          @for (entry of history.entries(); track entry.id) {
+          @for (item of historyItems(); track item.entry.id) {
+            @let entry = item.entry;
             <li>
               <div role="button" tabindex="0"
                 class="group flex w-full cursor-pointer items-start gap-2 rounded-lg px-2 py-2 text-left hover:bg-slate-100 dark:hover:bg-slate-800"
-                [class.history-active]="entry.content === input()"
+                [class.history-active]="item.active"
                 (click)="openEntry(entry)" (keydown.enter)="openEntry(entry)">
                 <div class="min-w-0 flex-1">
                   <div class="truncate text-sm">{{ entry.name }}</div>
-                  <div class="text-xs text-slate-500">{{ timeAgo(entry.createdAt) }} · {{ formatBytes(entry.size) }}</div>
+                  <div class="text-xs text-slate-500">{{ item.age }} · {{ item.size }}</div>
                 </div>
                 <button type="button" title="Delete"
                   class="cursor-pointer rounded p-1 text-slate-400 opacity-0 group-hover:opacity-100 hover:text-rose-500 focus:opacity-100"
@@ -112,9 +113,14 @@
           <span class="pane-title">
             Input
             @if (sourceName()) {
-              <span class="font-normal text-slate-500">· {{ sourceName() }}</span>
+              <span class="font-normal text-slate-500" [title]="sourceName()">· {{ sourceName() }}</span>
             }
           </span>
+          @if (sourceUrl() && !fetching()) {
+            <button type="button" class="btn-ghost -ml-1 shrink-0" (click)="refetch()" title="Fetch the URL again">
+              <fa-icon [icon]="icons.faRotateRight" />
+            </button>
+          }
           <div class="ml-auto flex shrink-0 gap-1">
             <button type="button" class="btn-ghost" (click)="openFilePicker()" title="Open file">
               <fa-icon [icon]="icons.faFileArrowUp" /><span class="hidden xl:inline">Open</span>
@@ -176,8 +182,8 @@
             <span class="min-w-0 truncate text-rose-600 dark:text-rose-400" [title]="err">
               <fa-icon [icon]="icons.faCircleExclamation" /> {{ err }}
             </span>
-            @if (inputUrl()) {
-              <button type="button" class="btn-ghost shrink-0 text-xs" (click)="fetchUrl()">
+            @if (inputUrl() || sourceUrl()) {
+              <button type="button" class="btn-ghost shrink-0 text-xs" (click)="refetch()">
                 <fa-icon [icon]="icons.faRotateRight" /> Retry
               </button>
             }

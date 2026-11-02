@@ -42,11 +42,14 @@ export class HistoryService {
   }
 
   async add(content: string, name: string): Promise<void> {
-    // Skip if identical to an existing entry – just bump it to the top.
-    const existing = this.entries().find((e) => e.content === content);
+    // Reuse an entry with identical content, or, for documents fetched from a URL, the entry
+    // for that URL (so refreshing a URL updates it instead of piling up copies).
+    const fromUrl = /^https?:\/\//i.test(name);
+    const existing = this.entries().find((e) => e.content === content || (fromUrl && e.name === name));
     const db = await this.db;
     if (existing?.id != null) {
-      await db.put('history', { ...existing, name, createdAt: Date.now() });
+      const size = new Blob([content]).size;
+      await db.put('history', { ...existing, name, content, size, createdAt: Date.now() });
     } else {
       await db.add('history', { name, content, size: new Blob([content]).size, createdAt: Date.now() });
     }
