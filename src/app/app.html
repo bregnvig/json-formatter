@@ -1,10 +1,10 @@
 <div class="flex h-dvh flex-col">
   <!-- Header -->
   <header
-    class="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-slate-200 bg-white px-4 py-2.5 dark:border-slate-800 dark:bg-slate-900"
+    class="flex flex-wrap items-center gap-x-2 gap-y-2 border-b sm:gap-x-4 border-slate-200 bg-white px-4 py-2.5 dark:border-slate-800 dark:bg-slate-900"
   >
     <div class="flex items-center gap-2">
-      <span class="grid size-8 place-items-center rounded-lg bg-sky-600 text-white dark:bg-sky-500">
+      <span class="grid size-8 shrink-0 place-items-center rounded-lg bg-sky-600 text-white max-[379px]:hidden dark:bg-sky-500">
         <fa-icon [icon]="icons.faCode" />
       </span>
       <!-- Byline sits under the title on phones, beside it from sm and up. -->
@@ -26,10 +26,15 @@
       </div>
     </div>
 
-    <div class="ml-auto flex items-center gap-2">
+    <div class="ml-auto flex items-center gap-1 sm:gap-2">
       <button type="button" class="btn-ghost" popovertarget="help" title="What can it do? (?)" aria-label="Help">
         <fa-icon [icon]="icons.faCircleInfo" />
       </button>
+      <!-- Hidden on phones to keep the header on one row; the help links to the source too. -->
+      <a class="btn-ghost hidden sm:inline-flex" href="https://github.com/bregnvig/json-formatter" target="_blank" rel="noopener"
+        title="Source code on GitHub" aria-label="Source code on GitHub">
+        <fa-icon [icon]="icons.faGithub" />
+      </a>
       <button type="button" class="btn-ghost" (click)="historyOpen.set(!historyOpen())" [class.btn-active]="historyOpen()"
         title="History">
         <fa-icon [icon]="icons.faClockRotateLeft" />

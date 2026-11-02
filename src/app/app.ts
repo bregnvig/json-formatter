@@ -11,6 +11,7 @@ import {
 } from '@angular/core';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { FaIconComponent } from '@fortawesome/angular-fontawesome';
+import { faGithub } from '@fortawesome/free-brands-svg-icons';
 import {
   faAnglesDown,
   faAnglesUp,
@@ -77,6 +78,7 @@ export class App {
     faCheck,
     faCircleExclamation,
     faCircleInfo,
+    faGithub,
     faClockRotateLeft,
     faCode,
     faCompress,
