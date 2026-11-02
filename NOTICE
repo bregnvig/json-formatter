@@ -1,0 +1,20 @@
+JSON Formatter
+https://json.loopme.dk
+
+The source code is licensed under the BSD Zero Clause License (see LICENSE).
+
+The Loopme name and logo are not covered by that license and may not be used
+without permission. This applies to:
+
+  public/loopme.svg
+  public/favicon.svg
+  public/favicon.ico
+  public/apple-touch-icon.png
+  public/og-image.png
+  public/icons/
+
+If you fork the project, replace these files with your own.
+
+Third-party packages keep their own licenses. A production build lists them in
+3rdpartylicenses.txt, which is also published at
+https://json.loopme.dk/3rdpartylicenses.txt.

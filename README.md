@@ -35,7 +35,7 @@ The custom domain is set by `public/CNAME` (`json.loopme.dk`), which needs a DNS
 The code is released under the [Zero-Clause BSD license](LICENSE): do whatever you like with it, no
 attribution needed.
 
-The Loopme name and logo are not part of that license. If you fork the project, replace the logo,
+The Loopme name and logo are not part of that license (see [NOTICE](NOTICE)). If you fork the project, replace the logo,
 the icons in `public/icons/`, `public/favicon.*`, `public/apple-touch-icon.png` and
 `public/og-image.png`. Third-party packages keep their own licenses; a production build lists them
 in `3rdpartylicenses.txt`.
