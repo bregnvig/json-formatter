@@ -44,6 +44,7 @@ import { formatBytes, highlightChunks, parseJson, sortKeysDeep } from './json-ut
 import { isBoolean, oneOf, persistedSignal } from './prefs';
 import { asHttpUrl, fetchText, fileNameFromUrl } from './url-fetch';
 import { ThemeMode, ThemeService } from './theme.service';
+import { UpdateService } from './update.service';
 
 type Indent = '2' | '4' | 'tab';
 type View = 'tree' | 'text';
@@ -66,6 +67,7 @@ export class App {
   protected readonly theme = inject(ThemeService);
   private readonly sanitizer = inject(DomSanitizer);
   protected readonly history = inject(HistoryService);
+  protected readonly updates = inject(UpdateService);
 
   protected readonly icons = {
     faAnglesDown,

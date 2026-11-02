@@ -276,4 +276,24 @@
       </section>
     </main>
   </div>
+  @if (updates.available()) {
+    <div
+      role="status"
+      animate.enter="toast-enter"
+      animate.leave="toast-leave"
+      class="fixed right-4 bottom-4 z-50 flex items-center gap-3 rounded-xl border border-slate-200 bg-white py-2 pr-2 pl-4 text-sm shadow-lg dark:border-slate-700 dark:bg-slate-800"
+    >
+      <span>A new version is available</span>
+      <button
+        type="button"
+        class="inline-flex cursor-pointer items-center gap-1.5 rounded-md bg-sky-600 px-3 py-1 text-white hover:bg-sky-700 dark:bg-sky-500 dark:hover:bg-sky-400"
+        (click)="updates.reload()"
+      >
+        <fa-icon [icon]="icons.faRotateRight" /> Reload
+      </button>
+      <button type="button" class="btn-ghost" title="Later" (click)="updates.dismiss()">
+        <fa-icon [icon]="icons.faXmark" />
+      </button>
+    </div>
+  }
 </div>
