@@ -1,3 +1,120 @@
-/* You can add global styles to this file, and also import other style files */
-
+@import '@fontsource/ubuntu-mono/400.css';
+@import '@fontsource/ubuntu-mono/700.css';
 @import 'tailwindcss';
+
+/* Class-based dark mode, driven by ThemeService (light / dark / system). */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-mono: 'Ubuntu Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-sans: 'Ubuntu Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+@layer base {
+  html,
+  body {
+    @apply h-full;
+  }
+
+  body {
+    @apply bg-slate-50 text-slate-800 antialiased dark:bg-slate-950 dark:text-slate-200;
+  }
+
+  :root {
+    color-scheme: light;
+  }
+
+  :root.dark {
+    color-scheme: dark;
+  }
+}
+
+/* JSON syntax colors, shared by the tree and text views. */
+@layer components {
+  .tok-key {
+    @apply text-sky-700 dark:text-sky-300;
+  }
+  .tok-string {
+    @apply text-emerald-700 dark:text-emerald-400;
+  }
+  .tok-number {
+    @apply text-amber-700 dark:text-amber-400;
+  }
+  .tok-boolean {
+    @apply text-violet-700 dark:text-violet-400;
+  }
+  .tok-null {
+    @apply text-rose-600 dark:text-rose-400;
+  }
+  .tok-punct {
+    @apply text-slate-500 dark:text-slate-500;
+  }
+}
+
+@layer components {
+  .pane {
+    @apply flex min-h-0 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900;
+  }
+  .pane-toolbar {
+    @apply flex flex-wrap items-center gap-2 border-b border-slate-200 px-2 py-1.5 dark:border-slate-800;
+  }
+  .pane-title {
+    @apply min-w-0 truncate px-1 font-bold;
+  }
+  .pane-footer {
+    @apply flex items-center gap-3 border-t border-slate-200 px-3 py-1.5 text-xs dark:border-slate-800;
+  }
+  .btn-ghost {
+    @apply inline-flex cursor-pointer items-center gap-1.5 rounded-md px-2 py-1 text-sm text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white;
+  }
+  .btn-active {
+    @apply bg-sky-100 text-sky-700 hover:bg-sky-100 hover:text-sky-700 dark:bg-sky-950 dark:text-sky-300 dark:hover:bg-sky-950 dark:hover:text-sky-300;
+  }
+  .seg {
+    @apply inline-flex cursor-pointer items-center gap-1.5 rounded-md px-2.5 py-0.5 text-sm text-slate-500 transition hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-40 dark:text-slate-400 dark:hover:text-white;
+  }
+  .seg-on {
+    @apply bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-white;
+  }
+  .history-active {
+    @apply bg-sky-50 dark:bg-slate-800;
+  }
+  .btn-ghost select option {
+    @apply bg-white text-slate-800 dark:bg-slate-900 dark:text-slate-200;
+  }
+}
+
+/* Let the browser skip layout/paint of off-screen blocks in large documents. */
+.cv-chunk {
+  content-visibility: auto;
+}
+
+/*
+ * History drawer. Animating margin-left (rather than transform) works for both layouts:
+ * as an overlay on small screens it slides in, and as a side column on large screens the
+ * editor panes resize smoothly alongside it instead of jumping.
+ */
+.drawer-enter {
+  animation: drawer-in 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.drawer-leave {
+  animation: drawer-out 160ms cubic-bezier(0.4, 0, 1, 1) forwards;
+}
+@keyframes drawer-in {
+  from {
+    margin-left: -18rem;
+    opacity: 0;
+  }
+}
+@keyframes drawer-out {
+  to {
+    margin-left: -18rem;
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .drawer-enter,
+  .drawer-leave {
+    animation: none;
+  }
+}

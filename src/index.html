@@ -1,13 +1,56 @@
 <!doctype html>
 <html lang="en">
-<head>
-  <meta charset="utf-8">
-  <title>JsonFormatter</title>
-  <base href="/">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="icon" type="image/x-icon" href="favicon.ico">
-</head>
-<body>
-  <app-root></app-root>
-</body>
+  <head>
+    <meta charset="utf-8" />
+    <title>JSON Formatter – free, fast and without ads</title>
+    <base href="/" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="Free JSON formatter and validator without ads. Paste JSON or drop a file to pretty-print, minify, validate and explore it as a tree. Runs in your browser, works offline, nothing is uploaded."
+    />
+    <meta name="keywords" content="json formatter, json validator, json beautifier, json viewer, pretty print json, minify json, no ads" />
+    <link rel="canonical" href="https://json.loopme.dk/" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://json.loopme.dk/" />
+    <meta property="og:title" content="JSON Formatter – free, fast and without ads" />
+    <meta property="og:description" content="Format, validate and explore JSON in your browser. No ads, no uploads, works offline." />
+    <meta property="og:image" content="https://json.loopme.dk/icons/maskable-512x512.png" />
+    <meta name="twitter:card" content="summary" />
+
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "JSON Formatter",
+        "url": "https://json.loopme.dk/",
+        "description": "Free JSON formatter and validator without ads. Runs entirely in your browser.",
+        "applicationCategory": "DeveloperApplication",
+        "operatingSystem": "Any",
+        "browserRequirements": "Requires JavaScript",
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "EUR" }
+      }
+    </script>
+    <meta name="theme-color" content="#f8fafc" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#020617" media="(prefers-color-scheme: dark)" />
+    <link rel="icon" href="favicon.ico" sizes="48x48" />
+    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <script>
+      // Apply the stored theme before first paint to avoid a light/dark flash.
+      (() => {
+        try {
+          var t = localStorage.getItem('theme') || 'system';
+          var dark = t === 'dark' || (t === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
+          document.documentElement.classList.toggle('dark', dark);
+        } catch (e) {}
+      })();
+    </script>
+  </head>
+  <body>
+    <app-root></app-root>
+    <noscript>JSON Formatter is a free JSON formatter and validator without ads. Enable JavaScript to use it.</noscript>
+  </body>
 </html>

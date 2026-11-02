@@ -1,59 +1,31 @@
-# JsonFormatter
+# JSON Formatter
 
-This project was generated using [Angular CLI](https://github.com/angular/angular-cli) version 22.2.5.
+A free JSON formatter and validator without ads: **https://json.loopme.dk**
 
-## Development server
+Paste JSON (anywhere on the page) or drop a file to pretty-print, minify, validate and explore it as a tree.
+Everything runs in the browser. Nothing is uploaded, and it works offline as an installable PWA.
 
-To start a local development server, run:
+- Tree and highlighted text views, expand/collapse all, maximize the output
+- Indent with 2 spaces, 4 spaces or tabs; optional key sorting
+- Error location with jump-to-error
+- History of previously parsed documents, stored locally in IndexedDB
+- Light, dark and system themes
 
-```bash
-ng serve
-```
+Built with Angular, Tailwind CSS, Ubuntu Mono (Fontsource) and Font Awesome Free.
 
-Once the server is running, open your browser and navigate to `http://localhost:4200/`. The application will automatically reload whenever you modify any of the source files.
-
-## Code scaffolding
-
-Angular CLI includes powerful code scaffolding tools. To generate a new component, run:
-
-```bash
-ng generate component component-name
-```
-
-For a complete list of available schematics (such as `components`, `directives`, or `pipes`), run:
+## Development
 
 ```bash
-ng generate --help
+npm install
+npm start        # http://localhost:4200
+npm test
+npm run build    # output in dist/json-formatter/browser
 ```
 
-## Building
+The service worker is only active in production builds.
 
-To build the project run:
+## Deployment
 
-```bash
-ng build
-```
-
-This will compile your project and store the build artifacts in the `dist/` directory. By default, the production build optimizes your application for performance and speed.
-
-## Running unit tests
-
-To execute unit tests with the [Vitest](https://vitest.dev/) test runner, use the following command:
-
-```bash
-ng test
-```
-
-## Running end-to-end tests
-
-For end-to-end (e2e) testing, run:
-
-```bash
-ng e2e
-```
-
-Angular CLI does not come with an end-to-end testing framework by default. You can choose one that suits your needs.
-
-## Additional Resources
-
-For more information on using the Angular CLI, including detailed command references, visit the [Angular CLI Overview and Command Reference](https://angular.dev/tools/cli) page.
+Every push to `main` builds, tests and deploys to GitHub Pages via `.github/workflows/deploy.yml`.
+The custom domain is set by `public/CNAME` (`json.loopme.dk`), which needs a DNS `CNAME` record pointing
+`json` at `bregnvig.github.io`.
