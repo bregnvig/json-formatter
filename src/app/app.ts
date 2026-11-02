@@ -203,6 +203,7 @@ export class App {
     const active = this.activeEntryId();
     return this.history.entries().map((entry) => ({
       entry,
+      fromUrl: asHttpUrl(entry.name) !== null,
       age: timeAgo(entry.createdAt, now),
       size: formatBytes(entry.size),
       active: entry.id === active,
@@ -530,13 +531,17 @@ export class App {
 
   // ── History ──────────────────────────────────────────────────────
 
-  /** Show a history entry. Entries that came from a URL are fetched again right away. */
-  protected openEntry(entry: HistoryEntry): void {
+  /**
+   * Show a history entry's saved copy. With `refetch`, an entry that came from a URL is also
+   * fetched again; the saved copy stays on screen until (and unless) the fetch succeeds.
+   */
+  protected openEntry(entry: HistoryEntry, { refetch = false } = {}, event?: Event): void {
+    event?.stopPropagation();
     const url = asHttpUrl(entry.name);
     this.setText(entry.content);
     this.sourceName.set(url || entry.name.endsWith('.json') ? entry.name : null);
     if (window.matchMedia('(max-width: 1023px)').matches) this.historyOpen.set(false);
-    if (url) this.fetchUrl(url, { keepCurrent: true });
+    if (url && refetch) this.fetchUrl(url, { keepCurrent: true });
   }
 
   protected removeEntry(event: Event, entry: HistoryEntry): void {

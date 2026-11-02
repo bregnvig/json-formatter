@@ -180,3 +180,10 @@
     transition: none;
   }
 }
+
+/* Per-entry buttons in the history list: hidden until hover/focus, always shown without hover. */
+@layer components {
+  .history-action {
+    @apply shrink-0 cursor-pointer rounded p-1 text-slate-400 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus:opacity-100 [@media(hover:none)]:opacity-100;
+  }
+}

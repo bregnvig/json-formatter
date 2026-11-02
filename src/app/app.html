@@ -85,11 +85,25 @@
                 [class.history-active]="item.active"
                 (click)="openEntry(entry)" (keydown.enter)="openEntry(entry)">
                 <div class="min-w-0 flex-1">
-                  <div class="truncate text-sm">{{ entry.name }}</div>
+                  <div class="truncate text-sm">
+                    @if (item.fromUrl) {
+                      <fa-icon [icon]="icons.faGlobe" class="mr-1 text-xs text-slate-400" title="Fetched from a URL" />
+                    }
+                    {{ entry.name }}
+                  </div>
                   <div class="text-xs text-slate-500">{{ item.age }} · {{ item.size }}</div>
                 </div>
-                <button type="button" title="Delete"
-                  class="cursor-pointer rounded p-1 text-slate-400 opacity-0 group-hover:opacity-100 hover:text-rose-500 focus:opacity-100"
+                <!-- Row click loads the saved copy; these act on the entry. Revealed on hover,
+                     always shown on touch screens (no hover) and when focused. -->
+                @if (item.fromUrl) {
+                  <button type="button" title="Fetch again" aria-label="Fetch again"
+                    class="history-action hover:text-sky-600 dark:hover:text-sky-400"
+                    (click)="openEntry(entry, { refetch: true }, $event)">
+                    <fa-icon [icon]="icons.faRotateRight" />
+                  </button>
+                }
+                <button type="button" title="Delete" aria-label="Delete"
+                  class="history-action hover:text-rose-500"
                   (click)="removeEntry($event, entry)">
                   <fa-icon [icon]="icons.faTrashCan" />
                 </button>
