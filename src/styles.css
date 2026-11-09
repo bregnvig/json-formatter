@@ -76,6 +76,12 @@
   .seg-on {
     @apply bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-white;
   }
+  .header-input {
+    @apply rounded-md border border-slate-300 bg-transparent px-2 py-1 font-mono text-sm outline-none focus:border-sky-500 dark:border-slate-600;
+  }
+  .header-invalid {
+    @apply border-rose-500 dark:border-rose-500;
+  }
   .history-active {
     @apply bg-sky-50 dark:bg-slate-800;
   }

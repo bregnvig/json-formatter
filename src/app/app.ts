@@ -39,7 +39,9 @@ import {
   faXmark,
   faDownLeftAndUpRightToCenter,
   faGlobe,
+  faPlus,
   faRotateRight,
+  faSliders,
   faSpinner,
   faUpRightAndDownLeftFromCenter,
 } from '@fortawesome/free-solid-svg-icons';
@@ -47,6 +49,7 @@ import { HistoryEntry, HistoryService } from './history.service';
 import { FoldCommand, JsonNode } from './json-node';
 import { formatBytes, highlightChunks, parseJson, sortKeysDeep } from './json-utils';
 import { isBoolean, oneOf, persistedSignal } from './prefs';
+import { activeHeaders, isHeaderList, isValidHeaderName, isValidHeaderValue, RequestHeader } from './request-headers';
 import { asHttpUrl, describeFetchError, fileNameFromUrl, mixedContentProblem } from './url-fetch';
 import { ThemeMode, ThemeService } from './theme.service';
 import { UpdateService } from './update.service';
@@ -96,7 +99,9 @@ export class App {
     faXmark,
     faDownLeftAndUpRightToCenter,
     faGlobe,
+    faPlus,
     faRotateRight,
+    faSliders,
     faSpinner,
     faUpRightAndDownLeftFromCenter,
   };
@@ -129,13 +134,29 @@ export class App {
    * What to fetch. Each request is a new object (`seq`), so fetching the same URL again
    * re-runs the resource; setting it to undefined cancels an in-flight request.
    */
-  private readonly fetchRequest = signal<{ url: string; keepCurrent: boolean; seq: number } | undefined>(undefined);
+  private readonly fetchRequest = signal<
+    { url: string; headers: Record<string, string>; keepCurrent: boolean; seq: number } | undefined
+  >(undefined);
   private fetchSeq = 0;
+
+  /** Extra request headers sent with URL fetches (e.g. a tenant id). Each can be switched off. */
+  protected readonly requestHeaders = persistedSignal<RequestHeader[]>('requestHeaders', [], isHeaderList);
+  /** The headers that will actually be sent. Captured per request, so editing them doesn't refetch. */
+  private readonly activeHeaders = computed(() => activeHeaders(this.requestHeaders()));
+  protected readonly activeHeaderCount = computed(() => Object.keys(this.activeHeaders()).length);
+  /** Rows for the headers editor, with validation precomputed for the template. */
+  protected readonly headerRows = computed(() =>
+    this.requestHeaders().map((h) => ({
+      ...h,
+      badName: h.name.trim() !== '' && !isValidHeaderName(h.name),
+      badValue: !isValidHeaderValue(h.value),
+    })),
+  );
 
   /** GETs `fetchRequest` through HttpClient; cancels the previous request when it changes. */
   private readonly urlResource = httpResource.text(() => {
     const req = this.fetchRequest();
-    return req && { url: req.url };
+    return req && { url: req.url, headers: req.headers };
   });
 
   /** URL currently being fetched, if any. */
@@ -392,7 +413,6 @@ export class App {
     }
   }
 
-  /** GET the URL and show the response. The URL stays visible in the editor until it arrives. */
   /**
    * GET the URL and show the response. Normally the URL stays visible in the editor until
    * the response arrives; with `keepCurrent` (refreshing a result, e.g. from history) the
@@ -411,7 +431,21 @@ export class App {
       return;
     }
     this.fetchError.set(null);
-    this.fetchRequest.set({ url: url.href, keepCurrent, seq: ++this.fetchSeq });
+    this.fetchRequest.set({ url: url.href, headers: this.activeHeaders(), keepCurrent, seq: ++this.fetchSeq });
+  }
+
+  // ── Request headers ──────────────────────────────────────────────
+
+  protected addHeader(): void {
+    this.requestHeaders.update((list) => [...list, { name: '', value: '', enabled: true }]);
+  }
+
+  protected updateHeader(index: number, patch: Partial<RequestHeader>): void {
+    this.requestHeaders.update((list) => list.map((h, i) => (i === index ? { ...h, ...patch } : h)));
+  }
+
+  protected removeHeader(index: number): void {
+    this.requestHeaders.update((list) => list.filter((_, i) => i !== index));
   }
 
   /** Hand a finished fetch to the editor, then clear the request (the resource goes idle). */

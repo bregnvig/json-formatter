@@ -136,6 +136,13 @@
             </button>
           }
           <div class="ml-auto flex shrink-0 gap-1">
+            <button type="button" class="btn-ghost" popovertarget="headers" [class.btn-active]="activeHeaderCount()"
+              [title]="activeHeaderCount() ? activeHeaderCount() + ' request header(s) sent with URL fetches' : 'Request headers for URL fetches'">
+              <fa-icon [icon]="icons.faSliders" /><span class="hidden xl:inline">Headers</span>
+              @if (activeHeaderCount()) {
+                <span class="rounded-full bg-sky-200 px-1.5 text-xs dark:bg-sky-800">{{ activeHeaderCount() }}</span>
+              }
+            </button>
             <button type="button" class="btn-ghost" (click)="openFilePicker()" title="Open file">
               <fa-icon [icon]="icons.faFileArrowUp" /><span class="hidden xl:inline">Open</span>
             </button>
@@ -184,6 +191,9 @@
             <div class="flex max-w-[90%] flex-col items-center gap-3 text-center">
               <fa-icon [icon]="icons.faSpinner" animation="spin" class="text-2xl text-sky-600 dark:text-sky-400" />
               <span class="text-sm">Fetching</span>
+              @if (activeHeaderCount()) {
+                <span class="text-xs text-slate-500">with {{ activeHeaderCount() }} header{{ activeHeaderCount() === 1 ? '' : 's' }}</span>
+              }
               <span class="max-w-full truncate text-xs text-slate-500" [title]="fetching()">{{ fetching() }}</span>
               <button type="button" class="btn-ghost text-xs" (click)="cancelFetch()">Cancel (Esc)</button>
             </div>
@@ -304,6 +314,47 @@
       </section>
     </main>
   </div>
+  <!-- Request headers sent with URL fetches. Saved in this browser. -->
+  <div
+    id="headers"
+    popover
+    class="help-popover fixed inset-auto top-28 right-4 m-0 max-h-[calc(100dvh-8rem)] w-[min(32rem,calc(100vw-2rem))] overflow-y-auto rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-700 shadow-xl lg:right-auto lg:left-4 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+  >
+    <div class="mb-2 flex items-center justify-between">
+      <h2 class="text-base font-bold text-slate-900 dark:text-white">Request headers</h2>
+      <button type="button" class="btn-ghost" popovertarget="headers" popovertargetaction="hide" aria-label="Close">
+        <fa-icon [icon]="icons.faXmark" />
+      </button>
+    </div>
+    <p class="mb-3 text-xs text-slate-500 dark:text-slate-400">
+      Ticked headers are sent with every URL fetch. The server must allow them (CORS <code>Access-Control-Allow-Headers</code>).
+    </p>
+    <ul class="space-y-1.5">
+      @for (h of headerRows(); track $index; let i = $index) {
+        <li class="flex items-center gap-2" [class.opacity-50]="!h.enabled">
+          <input type="checkbox" class="size-4 shrink-0 cursor-pointer accent-sky-600" [checked]="h.enabled"
+            [attr.aria-label]="(h.enabled ? 'Disable ' : 'Enable ') + (h.name || 'header')"
+            (change)="updateHeader(i, { enabled: $any($event.target).checked })" />
+          <input type="text" class="header-input w-2/5" placeholder="Name" spellcheck="false" autocomplete="off"
+            [value]="h.name" [class.header-invalid]="h.badName" [title]="h.badName ? 'Not a valid header name' : ''"
+            (input)="updateHeader(i, { name: $any($event.target).value })" />
+          <input type="text" class="header-input min-w-0 flex-1" placeholder="Value" spellcheck="false" autocomplete="off"
+            [value]="h.value" [class.header-invalid]="h.badValue"
+            (input)="updateHeader(i, { value: $any($event.target).value })" />
+          <button type="button" class="btn-ghost shrink-0 px-1.5 hover:text-rose-500" title="Remove" aria-label="Remove header"
+            (click)="removeHeader(i)">
+            <fa-icon [icon]="icons.faTrashCan" />
+          </button>
+        </li>
+      } @empty {
+        <li class="py-2 text-center text-xs text-slate-500">No headers yet.</li>
+      }
+    </ul>
+    <button type="button" class="btn-ghost mt-2 -ml-2 text-sky-700 dark:text-sky-400" (click)="addHeader()">
+      <fa-icon [icon]="icons.faPlus" /> Add header
+    </button>
+  </div>
+
   <!-- Native popover: click outside or Esc closes it, focus is handled by the browser. -->
   <div
     #help
@@ -321,6 +372,7 @@
     <ul class="list-disc space-y-1.5 pl-5 marker:text-slate-400">
       <li>Paste JSON anywhere on the page, or drop a <code>.json</code> file on the input.</li>
       <li>Paste a link to load JSON from a URL. The server has to allow requests from other websites (CORS).</li>
+      <li>Add request headers (e.g. a tenant id or API key) under Headers; tick them on or off as needed.</li>
       <li>Escaped JSON such as <code>{{ escapedExample }}</code> is unescaped automatically.</li>
       <li>Explore it as a tree or as highlighted text. Sort keys, change indentation, copy or download.</li>
       <li>Format or minify the input itself. Click an error to jump to it.</li>
